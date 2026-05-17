@@ -40,14 +40,21 @@ import { useState, useEffect, useMemo, useRef } from "react";
 // ── Claude AI API ─────────────────────────────────────────────────────────────
 async function askClaude(prompt, system = "") {
   try {
-    console.log("API KEY:", import.meta.env.VITE_ANTHROPIC_KEY);
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("/api/claude", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
       },
+      body: JSON.stringify({ prompt, system }),
+    });
+
+    const data = await res.json();
+    return data.content?.[0]?.text || "No response";
+  } catch (err) {
+    console.log("Error:", err);
+    return "AI unavailable right now.";
+  }
+}
       body: JSON.stringify({
         model: "claude-3-5-sonnet-20240620",
         max_tokens: 1000,
