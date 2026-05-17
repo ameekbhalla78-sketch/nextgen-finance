@@ -46,20 +46,30 @@ async function askClaude(prompt, system = "") {
         "Content-Type": "application/json",
         "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,
         "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-3-5-sonnet-20240620",
         max_tokens: 1000,
-        system: system || "You are a friendly finance educator for high school students. This is a SIMULATION app — no real money is involved. Use simple, engaging language with zero financial jargon. Always remind users this is for learning only.",
+        system:
+          system ||
+          "You are a friendly finance educator for high school students. This is a SIMULATION app — no real money is involved. Use simple, engaging language with zero financial jargon.",
         messages: [{ role: "user", content: prompt }],
       }),
     });
-    const data = await res.json();
-    return data.content?.map(b => b.text || "").join("") || "";
-  } catch { return "AI unavailable right now. Try again in a moment!"; }
-}
 
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.log("Claude API error:", data);
+      return "AI error. Check console.";
+    }
+
+    return data.content?.map((b) => b.text).join("") || "";
+  } catch (err) {
+    console.log("Network error:", err);
+    return "AI unavailable right now. Try again in a moment!";
+  }
+}
 // ── SIMULATION DISCLAIMER ─────────────────────────────────────────────────────
 const DISCLAIMER = "⚠️ SIMULATION ONLY — All prices, trades, and data are 100% virtual. This is a learning tool, not financial advice. No real money is ever involved.";
 
