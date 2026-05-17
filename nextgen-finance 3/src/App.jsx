@@ -67,7 +67,9 @@ async function askClaude(prompt, system = "") {
 
     return data.content?.map((b) => b.text).join("") || "";
   } catch (err) {
-  console.log("Claude error:", err);
+  console.log("🔥 FULL ERROR:", err);
+  console.log("🔥 ERROR NAME:", err?.name);
+  console.log("🔥 ERROR MESSAGE:", err?.message);
   return "AI unavailable right now. Try again in a moment!";
 }
 }
