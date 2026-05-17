@@ -37,7 +37,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 // 3. Replace localStorage calls with Firestore reads/writes
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Claude AI API ─────────────────────────────────────────────────────────────
 async function askClaude(prompt, system = "") {
   try {
     const res = await fetch("/api/claude", {
@@ -45,40 +44,24 @@ async function askClaude(prompt, system = "") {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt, system }),
-    });
-
-    const data = await res.json();
-    return data.content?.[0]?.text || "No response";
-  } catch (err) {
-    console.log("Error:", err);
-    return "AI unavailable right now.";
-  }
-}
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 1000,
-        system:
-          system ||
-          "You are a friendly finance educator for high school students. This is a SIMULATION app — no real money is involved. Use simple, engaging language with zero financial jargon.",
-        messages: [{ role: "user", content: prompt }],
+        prompt,
+        system,
       }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      console.log("Claude API error:", data);
+      console.log("API error:", data);
       return "AI error. Check console.";
     }
 
-    return data.content?.map((b) => b.text).join("") || "";
+    return data.content?.[0]?.text || "No response";
   } catch (err) {
-  console.log("🔥 FULL ERROR:", err);
-  console.log("🔥 ERROR NAME:", err?.name);
-  console.log("🔥 ERROR MESSAGE:", err?.message);
-  return "AI unavailable right now. Try again in a moment!";
-}
+    console.log("Error:", err);
+    return "AI unavailable right now.";
+  }
 }
 // ── SIMULATION DISCLAIMER ─────────────────────────────────────────────────────
 const DISCLAIMER = "⚠️ SIMULATION ONLY — All prices, trades, and data are 100% virtual. This is a learning tool, not financial advice. No real money is ever involved.";
