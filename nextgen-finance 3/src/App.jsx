@@ -40,6 +40,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 // ── Claude AI API ─────────────────────────────────────────────────────────────
 async function askClaude(prompt, system = "") {
   try {
+    console.log("API KEY:", import.meta.env.VITE_ANTHROPIC_KEY);
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -66,9 +67,9 @@ async function askClaude(prompt, system = "") {
 
     return data.content?.map((b) => b.text).join("") || "";
   } catch (err) {
-    console.log("Network error:", err);
-    return "AI unavailable right now. Try again in a moment!";
-  }
+  console.log("Claude error:", err);
+  return "AI unavailable right now. Try again in a moment!";
+}
 }
 // ── SIMULATION DISCLAIMER ─────────────────────────────────────────────────────
 const DISCLAIMER = "⚠️ SIMULATION ONLY — All prices, trades, and data are 100% virtual. This is a learning tool, not financial advice. No real money is ever involved.";
