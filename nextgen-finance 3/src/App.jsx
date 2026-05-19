@@ -37,32 +37,37 @@ import { useState, useEffect, useMemo, useRef } from "react";
 // 3. Replace localStorage calls with Firestore reads/writes
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Claude AI API ─────────────────────────────────────────────────────────────
+// ── OpenAI GPT-4o API ─────────────────────────────────────────────────────
+// Replace the key below with your new key from platform.openai.com/api-keys
+// NEVER share this key publicly — rotate it immediately if exposed
+const OPENAI_KEY = "sk-proj-REPLACE_WITH_YOUR_NEW_KEY";
+
 async function askClaude(prompt, system = "") {
   try {
-    const res = await fetch("/api/claude", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_KEY}`,
       },
       body: JSON.stringify({
-        prompt,
-        system,
+        model: "gpt-4o",
+        max_tokens: 1000,
+        messages: [
+          {
+            role: "system",
+            content: system || "You are a friendly finance educator for high school students. This is a SIMULATION app — no real money is involved. Use simple, engaging language with zero financial jargon. Always remind users this is for learning only."
+          },
+          { role: "user", content: prompt }
+        ],
       }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      console.log("API error:", data);
-      return "AI error. Check console.";
-    }
-
-    return data.content?.[0]?.text || "No response";
-  } catch (err) {
-    console.log("Error:", err);
-    return "AI unavailable right now.";
-  }
+    return data.choices?.[0]?.message?.content || "";
+  } catch { return "AI unavailable right now. Try again in a moment!"; }
 }
+
 // ── SIMULATION DISCLAIMER ─────────────────────────────────────────────────────
 const DISCLAIMER = "⚠️ SIMULATION ONLY — All prices, trades, and data are 100% virtual. This is a learning tool, not financial advice. No real money is ever involved.";
 
@@ -733,10 +738,12 @@ function AuthScreen({ onLogin }) {
     if(mode==="login"){
       if(!form.email||!form.password){setErr("Fill in all fields.");return;}
       setLoading(true);setErr("");
-      await new Promise(r=>setTimeout(r,700));
-      const db=JSON.parse(localStorage.getItem("ngf3_db")||"{}");
-      if(!db[form.email]){setErr("No account found with that email.");setLoading(false);return;}
-      onLogin(db[form.email],form.email);
+      try {
+        await new Promise(r=>setTimeout(r,700));
+        const store=JSON.parse(localStorage.getItem("ngf3_db")||"{}");
+        if(!store[form.email]){setErr("No account found with that email.");setLoading(false);return;}
+        onLogin(store[form.email],form.email);
+      } catch(e){setErr("Login failed. Try again.");}
       setLoading(false);
     } else {
       if(step===1){
@@ -746,26 +753,27 @@ function AuthScreen({ onLogin }) {
       }
       if(step===2){setErr("");setStep(3);return;}
       setLoading(true);setErr("");
-      await new Promise(r=>setTimeout(r,800));
-      const db=JSON.parse(localStorage.getItem("ngf3_db")||"{}");
-      if(db[form.email]){setErr("Email already registered.");setLoading(false);setStep(1);return;}
-      const user={
-        name:form.name,email:form.email,grade:form.grade,school:form.school,
-        interests:form.interests,riskTolerance:form.riskTolerance,goals:form.goals,
-        // Simulation account — $10,000 virtual money
-        balance:10000, portfolio:{}, watchlist:["AAPL","NVDA","AMZN","RBLX"],
-        tradeHistory:[], tradeNotes:{}, aiReads:0,
-        xp:0,streak:1,badges:[],completedLessons:[],perfectQuizzes:0,bigTrades:0,notedTrades:0,
-        challenges:BASE_CHALLENGES.map(c=>({...c,progress:0,done:false})),
-        history:genHistory(30,10000,.005),
-        savedOpps:[], applicationTracker:[], goals_portfolio:[],
-        activityFeed:[{text:"Welcome to NextGen Finance! Your simulation starts with $10,000 🎉",icon:"🎉",color:"var(--blue3)",ts:Date.now()}],
-        notifications:[{id:1,msg:"Welcome! You have $10,000 in virtual money to start your investing simulation.",read:false,ts:Date.now()}],
-        lastLogin:Date.now(), comebacks:0, sectors:0,
-      };
-      db[form.email]=user;
-      localStorage.setItem("ngf3_db",JSON.stringify(db));
-      onLogin(user,form.email);
+      try {
+        await new Promise(r=>setTimeout(r,800));
+        const store=JSON.parse(localStorage.getItem("ngf3_db")||"{}");
+        if(store[form.email]){setErr("Email already registered.");setLoading(false);setStep(1);return;}
+        const user={
+          name:form.name,email:form.email,grade:form.grade,school:form.school,
+          interests:form.interests,riskTolerance:form.riskTolerance,goals:form.goals,
+          balance:10000, portfolio:{}, watchlist:["AAPL","NVDA","AMZN","RBLX"],
+          tradeHistory:[], tradeNotes:{}, aiReads:0,
+          xp:0,streak:1,badges:[],completedLessons:[],perfectQuizzes:0,bigTrades:0,notedTrades:0,
+          challenges:BASE_CHALLENGES.map(c=>({...c,progress:0,done:false})),
+          history:genHistory(30,10000,.005),
+          savedOpps:[], applicationTracker:[], goals_portfolio:[],
+          activityFeed:[{text:"Welcome to NextGen Finance! Your simulation starts with $10,000 🎉",icon:"🎉",color:"var(--blue3)",ts:Date.now()}],
+          notifications:[{id:1,msg:"Welcome! You have $10,000 in virtual money to start your investing simulation.",read:false,ts:Date.now()}],
+          lastLogin:Date.now(), comebacks:0, sectors:0,
+        };
+        store[form.email]=user;
+        localStorage.setItem("ngf3_db",JSON.stringify(store));
+        onLogin(user,form.email);
+      } catch(e){setErr("Sign up failed. Try again.");}
       setLoading(false);
     }
   };
