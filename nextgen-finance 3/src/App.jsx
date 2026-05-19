@@ -38,34 +38,171 @@ import { useState, useEffect, useMemo, useRef } from "react";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Claude AI API ─────────────────────────────────────────────────────────────
-// ── OpenAI GPT-4o API ─────────────────────────────────────────────────────
-// Replace the key below with your new key from platform.openai.com/api-keys
-// NEVER share this key publicly — rotate it immediately if exposed
-const OPENAI_KEY = "sk-proj-REPLACE_WITH_YOUR_NEW_KEY";
+// ── Built-in AI Engine — no external API needed ──────────────────────────
+// All responses are generated locally using smart template logic.
+// No API keys, no costs, no external dependencies.
 
-async function askClaude(prompt, system = "") {
-  try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "system",
-            content: system || "You are a friendly finance educator for high school students. This is a SIMULATION app — no real money is involved. Use simple, engaging language with zero financial jargon. Always remind users this is for learning only."
-          },
-          { role: "user", content: prompt }
-        ],
-      }),
-    });
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || "";
-  } catch { return "AI unavailable right now. Try again in a moment!"; }
+const STOCK_EXPLAINERS = {
+  AAPL: { what:"Apple makes the iPhone, Mac computers, AirPods, and runs the App Store. Think of it like the world's most valuable ecosystem — once you're in (iPhone, MacBook, Apple Watch), you rarely leave.", why_up:"Investors are excited about Apple's growth in services like Apple Music, iCloud, and the App Store — which now make more money than hardware. Strong iPhone sales also help.", why_down:"Concerns about slowing iPhone upgrades and competition in China are weighing on the stock today.", risk:"Risk: Very dependent on iPhone sales. Opportunity: Services revenue keeps growing year after year.", sector:"Technology" },
+  TSLA: { what:"Tesla builds electric cars and energy storage systems. They also develop Autopilot, one of the most advanced self-driving systems. Think of them as a tech company that happens to make cars.", why_up:"Positive news around Tesla's new vehicle lineup and expanding Supercharger network is driving optimism today.", why_down:"Concerns about slowing EV demand and increasing competition from other automakers are pressuring the stock.", risk:"Risk: Very volatile — can move 5-10% in a day. Opportunity: If EVs take over, Tesla is already the leader.", sector:"Automotive" },
+  MSFT: { what:"Microsoft makes Windows, Office (Word, Excel, PowerPoint), and Azure — the cloud that runs thousands of companies' websites and apps. They also own Xbox and LinkedIn.", why_up:"Strong growth in Azure cloud services is the story today. Every company moving to the cloud benefits Microsoft.", why_down:"A slowdown in cloud spending and tough competition from Amazon AWS is creating headwinds today.", risk:"Risk: Mature company — slower growth. Opportunity: AI integration across all products is a massive new revenue stream.", sector:"Technology" },
+  GOOGL: { what:"Alphabet owns Google Search, YouTube, Google Maps, Gmail, Android, and Google Cloud. When you search anything online, Google probably gets paid. That's billions of searches every day.", why_up:"Strong digital advertising revenue and growth in Google Cloud are lifting the stock today.", why_down:"Concerns about AI threatening traditional search and slower ad spending are weighing on shares.", risk:"Risk: Heavily dependent on ad revenue which can slow in recessions. Opportunity: YouTube and Cloud are massive and still growing.", sector:"Technology" },
+  AMZN: { what:"Amazon started as an online bookstore and is now the world's largest online retailer. But their real profit engine is AWS — the cloud service that powers Netflix, Airbnb, and thousands of other apps.", why_up:"AWS growth is accelerating and advertising revenue is surging — both high-margin businesses driving profits up.", why_down:"Concerns about consumer spending slowdown and heavy investment costs are pressuring the stock today.", risk:"Risk: Heavy competition from Walmart online and Microsoft/Google in cloud. Opportunity: AWS dominates the most profitable part of tech infrastructure.", sector:"E-Commerce" },
+  NVDA: { what:"NVIDIA makes the GPUs (chips) that power video games, AI models like ChatGPT, and data centers. Every major AI company buys NVIDIA chips. Think of them as the pickaxe seller in a gold rush.", why_up:"Explosive AI chip demand is through the roof — every tech company is racing to buy NVIDIA's H100 chips to train AI models.", why_down:"After massive gains, investors are taking profits and worrying about whether AI chip demand can stay this high.", risk:"Risk: Very high valuation — already pricing in years of growth. Opportunity: AI is just getting started and NVIDIA has a huge head start.", sector:"Semiconductors" },
+  META: { what:"Meta owns Facebook, Instagram, WhatsApp, and Messenger — apps used by over 3 billion people daily. They make almost all their money from showing targeted ads to those billions of users.", why_up:"Strong ad revenue growth and cost-cutting measures are boosting profits — investors love the efficiency story.", why_down:"Concerns about younger users moving away from Facebook and heavy spending on VR/metaverse projects are creating doubt.", risk:"Risk: Privacy regulations could limit their ad targeting. Opportunity: WhatsApp monetization is barely started — huge untapped revenue.", sector:"Social Media" },
+  NFLX: { what:"Netflix is the world's largest streaming service with 260M+ subscribers paying monthly for movies and shows. They produce massive hits like Stranger Things and Squid Game.", why_up:"Subscriber growth beat expectations and password-sharing crackdowns are bringing in new paying customers.", why_down:"Competition from Disney+, HBO Max, and Apple TV+ is intensifying, and some subscribers are cutting back on spending.", risk:"Risk: Content costs billions every year. Opportunity: Advertising tier is a new revenue stream just getting started.", sector:"Entertainment" },
+  DIS: { what:"Disney owns theme parks, Disney+, Marvel, Star Wars, Pixar, ESPN, and ABC. It's one of the most iconic brands in human history — Mickey Mouse has existed for nearly 100 years.", why_up:"Theme park attendance is hitting records and Disney+ is growing its subscriber base profitably.", why_down:"Streaming losses and cord-cutting from ESPN are weighing on the company's overall profitability.", risk:"Risk: Streaming is expensive and competitive. Opportunity: Massive brand and IP library that can be monetized globally for decades.", sector:"Entertainment" },
+  SPOT: { what:"Spotify is the world's most popular music and podcast streaming app with 600M+ monthly listeners. They pay artists royalties and make money from premium subscriptions and ads.", why_up:"Premium subscriber growth and podcast advertising revenue are both ahead of expectations.", why_down:"Pressure from Apple Music and Amazon Music, plus rising royalty costs, are squeezing margins.", risk:"Risk: Music labels have enormous leverage over Spotify. Opportunity: Audiobooks and podcasts are new high-margin revenue streams.", sector:"Music" },
+  COIN: { what:"Coinbase is the largest US cryptocurrency exchange. When people buy Bitcoin or Ethereum in the US, many do it through Coinbase. Their revenue goes up and down with crypto trading volume.", why_up:"Rising crypto prices are bringing traders back to the platform, boosting transaction fees significantly.", why_down:"Crypto markets are cooling off and regulators are scrutinizing crypto exchanges more closely.", risk:"Risk: Revenue is extremely volatile — tied directly to crypto market cycles. Opportunity: If crypto becomes mainstream, Coinbase is the established on-ramp.", sector:"Crypto/Finance" },
+  PYPL: { what:"PayPal owns PayPal, Venmo, and Braintree — digital payment tools used by hundreds of millions of people. When you send money to a friend on Venmo or check out with PayPal, they take a small fee.", why_up:"New management is focused on profitability over growth, and investors are responding positively to the improved margins.", why_down:"Competition from Apple Pay, Google Pay, and Cash App is intensifying and user growth has slowed significantly.", risk:"Risk: Tough competition from big tech entering payments. Opportunity: Venmo monetization is still early — lots of room to grow.", sector:"Fintech" },
+  RBLX: { what:"Roblox is a gaming platform where 70M+ daily users create, play, and share games built by other users. Think of it like YouTube but for 3D games — creators build content and Roblox takes a cut.", why_up:"Daily active user growth and time-spent metrics beat expectations — engagement is accelerating.", why_down:"Slower bookings growth and high infrastructure costs are raising concerns about the path to profitability.", risk:"Risk: Core audience is very young — monetization is challenging. Opportunity: As users grow up, spending power increases significantly.", sector:"Gaming" },
+  SNAP: { what:"Snap makes Snapchat — the camera and messaging app famous for disappearing photos and AR filters. It's especially popular with people aged 13-24. They also make Spectacles AR glasses.", why_up:"New AR advertising tools are attracting brand advertisers and revenue per user is improving.", why_down:"Competition from Instagram Reels and TikTok is intense, and advertisers are shifting budgets to platforms with better targeting.", risk:"Risk: Very dependent on ad revenue from a narrow age demographic. Opportunity: AR technology could be transformative if it goes mainstream.", sector:"Social Media" },
+  ABNB: { what:"Airbnb is a platform where homeowners rent out their spaces to travelers. Instead of booking a hotel, you book someone's apartment or house. They operate in 220+ countries.", why_up:"Travel demand remains strong and Airbnb is seeing record nights booked with improving profitability.", why_down:"Concerns about over-tourism regulations in major cities and slowing consumer travel spending are weighing on shares.", risk:"Risk: Regulatory crackdowns in cities like NYC and Barcelona are limiting supply. Opportunity: Experiences business and long-term stays are growing fast.", sector:"Travel" },
+  SQ: { what:"Block (formerly Square) makes payment terminals for small businesses, runs Cash App for peer-to-peer payments, and offers Bitcoin trading. Jack Dorsey, Twitter's co-founder, runs it.", why_up:"Cash App monthly active users are growing and Bitcoin trading revenue is picking up with crypto markets.", why_down:"Competition in small business payments and slowdown in Cash App user growth are creating headwinds.", risk:"Risk: Exposed to both consumer fintech competition and crypto volatility. Opportunity: Merchant banking services could be a major new revenue stream.", sector:"Fintech" },
+};
+
+const STRATEGY_EXPLAINERS = {
+  tech_boom: "The Tech Boom strategy goes all-in on technology and AI stocks. In good times, this can produce massive returns — we're talking 30-50% years. But when tech falls out of favor (like 2022 when the Nasdaq dropped 33%), this strategy gets absolutely crushed. Best for: someone young with a long time horizon who can stomach wild swings. In our simulation, it's perfect for learning how volatile growth investing feels.",
+  balanced: "The Balanced Growth strategy spreads money across tech, finance, consumer goods, and other sectors. It won't have the explosive upside of pure tech, but it won't crater as badly in downturns either. This is actually what most professional investors recommend for most people. Best for: someone who wants steady, consistent growth without heart attacks. Warren Buffett basically runs a balanced strategy.",
+  recession: "The Bear Market Defense strategy focuses on companies that do well even when the economy struggles — think food companies, utilities, and healthcare. People still buy groceries and pay electric bills during recessions. Best for: protecting wealth when you think a downturn is coming. In our simulation, this is great for understanding why diversification across economic cycles matters so much.",
+  dividend: "The Dividend Focus strategy buys stocks that pay regular cash payments (dividends) to shareholders. You earn money just for holding the stock — like getting rent from an investment. Returns are slower but much more predictable. Best for: someone who wants passive income and hates uncertainty. This is how many retirees invest — they live off the dividend payments.",
+  yolo: "The High Risk YOLO strategy is exactly what it sounds like — betting big on the most volatile, speculative stocks. Crypto, meme stocks, early-stage companies. You could double your money or lose half of it. Best for: absolutely nobody with real money. But in our SIMULATION? It's perfect for understanding why risk management exists — losing 35% in a simulated year teaches you more than any book.",
+};
+
+const GLOSSARY_EXPLAINERS = {
+  "Stock": "Think of a company like a pizza. A stock is one slice of that pizza. If the pizza (company) becomes more valuable, your slice is worth more too. In our simulation, when you buy AAPL, you own a tiny slice of Apple Inc.",
+  "Bull Market": "Imagine everyone at school suddenly wants to buy the same sneaker — the price goes up because demand is high. A bull market is the same thing, but for all stocks. Everyone's buying, prices rise. The US stock market has been in a bull market about 78% of the time historically.",
+  "Bear Market": "The opposite of a bull market. Imagine that same sneaker suddenly goes out of style — nobody wants it, prices drop. A bear market is when stocks fall 20%+ broadly. They feel terrible, but they always end. Every single bear market in history has eventually recovered.",
+  "Portfolio": "Your portfolio is simply everything you own. In our simulation, it's whatever stocks you've bought with your $10,000. In real life, it might include stocks, bonds, real estate, and cash — everything together is your portfolio.",
+  "Diversification": "Never put all your eggs in one basket. If you carry one basket with all your eggs and you drop it, you lose everything. If you carry 10 baskets with a few eggs each, dropping one is not a disaster. In our simulation, try holding stocks from 5+ different sectors.",
+  "ETF": "An ETF is like a smoothie. Instead of eating one fruit (buying one stock), you blend 500 fruits together (the S&P 500 ETF). You get a little of everything. SPY is the most famous ETF — it holds shares in all 500 largest US companies at once.",
+  "P/E Ratio": "The P/E ratio tells you how excited people are about a company. If a stock has a P/E of 50, investors are paying $50 for every $1 of profit — they expect big growth ahead. A P/E of 10 means expectations are modest. In our app, check the P/E in each stock's detail panel.",
+  "Market Cap": "Market cap is the total value of a company. It's simply stock price × total shares. Apple's is ~$3.2 trillion. To put that in perspective, Apple is worth more than the entire GDP of France. In our simulation, market cap helps you understand if a company is tiny or massive.",
+  "Dividend": "Some companies share their profits with shareholders regularly — these payments are dividends. If you own 100 shares of a company paying $2/share annually, you get $200/year just for holding it. It's like getting paid rent for owning a piece of the company.",
+  "Volatility": "Volatility measures how wildly a stock's price swings. A stock that goes from $100 to $150 to $80 in a month is highly volatile. In our simulation, COIN and SNAP are the most volatile — great for learning how emotional roller-coaster investing feels without real consequences.",
+  "Compound Growth": "Compound growth is the most powerful force in personal finance. $1,000 at 10%/year: Year 1 → $1,100. Year 2 → $1,210. Year 10 → $2,594. Year 30 → $17,449. You earn returns on your returns. Starting at 16 instead of 26 could mean hundreds of thousands of extra dollars by retirement.",
+  "Short Selling": "Short selling is betting a stock will fall. You borrow shares, sell them immediately, wait for the price to drop, buy them back cheaper, and pocket the difference. Risk: if the stock rises instead of falls, your losses are unlimited. In our simulation we don't support short selling because the risk mechanics are too complex for beginners.",
+  "Liquidity": "Liquidity means how fast you can turn something into cash without losing value. Cash is perfectly liquid. Stocks are highly liquid — you can sell in seconds. Real estate is illiquid — selling takes months. In investing, always keep some liquid assets so you're never forced to sell at a bad time.",
+  "Index Fund": "An index fund tracks a market index like the S&P 500 automatically. No human manager picking stocks — just a computer buying all 500 companies in proportion. They're cheaper than managed funds and historically beat 90%+ of professional fund managers over 20+ years.",
+  "ROI": "Return on Investment is how you measure if something was worth it. Formula: (Gain ÷ Original Cost) × 100. In our simulation, if you buy $1,000 of NVDA and it becomes $1,300, your ROI is 30%. Simple and universal — works for stocks, businesses, even college tuition.",
+  "Blue Chip": "Blue chip stocks are the biggest, most established, most financially stable companies — Apple, Microsoft, Coca-Cola, Johnson & Johnson. They're called blue chip because in poker, the blue chips are worth the most. Lower risk, slower growth, but they almost never go bankrupt.",
+  "IPO": "An IPO is when a private company sells shares to the public for the first time. Before the IPO, only insiders own shares. After the IPO, anyone can buy. Famous IPOs include Google in 2004, Facebook in 2012, Airbnb in 2020. IPO day can be wild — prices often jump (or crash) dramatically.",
+  "Recession": "A recession is two consecutive quarters of economic contraction — the economy is shrinking. Jobs are lost, companies earn less, and stock markets usually fall. But recessions end — every single one in history has. The smart move is to stay invested and even buy more at lower prices.",
+  "Hedge": "Hedging is like buying insurance for your investments. If you own a lot of tech stocks, you might hedge by also buying something that goes UP when tech goes DOWN. It reduces your maximum gain but also limits your maximum loss. Most beginners don't need to worry about hedging.",
+  "Ticker Symbol": "A ticker symbol is the short code that identifies a stock on an exchange. AAPL = Apple. TSLA = Tesla. MSFT = Microsoft. GOOGL = Alphabet (Google's parent). They're used everywhere — on financial apps, news sites, trading platforms. In our simulation, you'll see ticker symbols on every stock card.",
+};
+
+const MARKET_BRIEFINGS = [
+  "🚀 Markets are heating up today! AI stocks are leading the charge as investors bet big on the technology reshaping entire industries. If you hold NVDA or MSFT in your simulation, today's a good day to check your gains. Lesson of the day: momentum can be powerful, but always ask yourself if the price still makes sense for what the company actually earns.",
+  "📉 It's a red day across the board, and that's actually fine. Every investor — even Warren Buffett — experiences down days, down months, and down years. The key is not to panic-sell. In our simulation, a red day is the perfect time to practice staying calm and sticking to your strategy. Remember: stocks go on sale when prices fall.",
+  "⚡ Mixed signals today — tech stocks are up while consumer stocks dip. This is classic sector rotation: investors moving money from one area to another. It shows why diversification matters. If your whole simulation portfolio is in tech, a tech down-day hurts a lot more than if you're spread across sectors.",
+  "💰 Earnings season is driving big moves today. Companies reporting better-than-expected profits are surging while misses are getting punished. This is how the market works — stock prices are essentially predictions about future profits. When reality beats the prediction, the stock jumps. Lesson: earnings reports are one of the biggest short-term price drivers.",
+  "🌍 Global markets are influencing US stocks today. News from Asia and Europe is rippling through to American companies that operate worldwide. This is a reminder that the stock market is global — events in China affect Apple, events in Europe affect McDonald's. Diversification across sectors helps, but not across countries in our simulation.",
+];
+
+function askClaude(prompt, system = "") {
+  // Built-in AI engine — generates contextual responses without any external API
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const p = prompt.toLowerCase();
+
+      // Stock explainer
+      for (const [sym, info] of Object.entries(STOCK_EXPLAINERS)) {
+        if (p.includes(sym.toLowerCase()) || p.includes(info.sector.toLowerCase())) {
+          const dir = p.includes("up") || p.includes("rising") || p.includes("+") ? "up" : "down";
+          const why = dir === "up" ? info.why_up : info.why_down;
+          resolve(`**What they do:** ${info.what}
+
+**Why it's moving:** ${why}
+
+**For beginners:** ${info.risk} ⚠️ Remember — this is a simulation. No real money is involved.`);
+          return;
+        }
+      }
+
+      // Strategy explainer
+      for (const [id, text] of Object.entries(STRATEGY_EXPLAINERS)) {
+        if (p.includes(id.replace("_", " ")) || p.includes(id)) {
+          resolve(text);
+          return;
+        }
+      }
+
+      // Glossary term
+      for (const [term, explanation] of Object.entries(GLOSSARY_EXPLAINERS)) {
+        if (p.includes(term.toLowerCase())) {
+          resolve(explanation);
+          return;
+        }
+      }
+
+      // Daily briefing
+      if (p.includes("briefing") || p.includes("today") || p.includes("market") && p.includes("brief")) {
+        resolve(MARKET_BRIEFINGS[Math.floor(Date.now() / 86400000) % MARKET_BRIEFINGS.length]);
+        return;
+      }
+
+      // AI Coach responses
+      if (p.includes("portfolio") && p.includes("performance")) {
+        resolve("Your simulated portfolio is a great learning tool! Focus on diversification — try to hold at least 4-5 stocks across different sectors. Watch how different sectors react differently to the same news. The goal isn't just profit — it's understanding why prices move. ⚠️ This is a simulation — no real money involved.");
+        return;
+      }
+      if (p.includes("compound")) {
+        resolve("Compound growth is the most powerful concept in personal finance! Here's the magic: $1,000 at 10%/year becomes $2,594 in 10 years and $17,449 in 30 years — without you doing anything extra. The secret? You earn returns on your returns. Starting young is your biggest advantage. ⚠️ Simulation only — not real financial advice.");
+        return;
+      }
+      if (p.includes("diversif")) {
+        resolve("Diversification means spreading your money so one bad investment doesn't wipe you out. In our simulation, try holding stocks from at least 4 different sectors — tech, entertainment, fintech, gaming. Check your Portfolio → Analytics tab to see your sector breakdown. ⚠️ This is a simulation — no real money is involved.");
+        return;
+      }
+      if (p.includes("etf")) {
+        resolve("An ETF (Exchange-Traded Fund) is like a bundle of many stocks in one investment. Instead of picking individual companies, you buy a slice of hundreds at once. The S&P 500 ETF (SPY) holds the 500 largest US companies. They're cheaper and often outperform individual stock-pickers over time. ⚠️ Simulation only — not real financial advice.");
+        return;
+      }
+      if (p.includes("p/e") || p.includes("pe ratio")) {
+        resolve("The P/E (Price-to-Earnings) ratio shows how much investors pay per dollar of profit. High P/E like NVDA at 68 means investors expect huge future growth. Low P/E like PYPL at 17 means more modest expectations. Neither is automatically good or bad — compare within the same industry. ⚠️ Simulation only — not real financial advice.");
+        return;
+      }
+      if (p.includes("stock") && (p.includes("what is") || p.includes("explain"))) {
+        resolve("A stock is a tiny piece of ownership in a real company. When you buy 1 share of Apple in our simulation, you're practicing what it means to be a part-owner of Apple Inc. If Apple grows and becomes more valuable, your share is worth more. If it struggles, your share falls. That's the core of how stock investing works. ⚠️ This is a simulation — no real money is involved.");
+        return;
+      }
+      if (p.includes("risk")) {
+        resolve("In investing, risk and reward are always linked — you can't have high returns without accepting higher risk. In our simulation, try both aggressive (tech stocks) and conservative (dividend stocks) strategies to feel the difference. Your risk tolerance is personal — how much loss could you handle emotionally? ⚠️ Simulation only — not real financial advice.");
+        return;
+      }
+      if (p.includes("simulation") || p.includes("how to use")) {
+        resolve("Great question! Here's how to get the most from NextGen Finance: 1) Start by completing lessons in the Learn Hub to build your knowledge foundation. 2) Make your first simulated trade in Markets — buy something you understand. 3) Watch how your Portfolio changes as simulated prices move. 4) Try the Strategy Simulator to see how different approaches play out. Everything here is virtual — the goal is learning, not profit!");
+        return;
+      }
+      if (p.includes("bull") || p.includes("bear")) {
+        resolve("A bull market is when stocks broadly rise over time — investors are optimistic and buying. A bear market is when stocks fall 20%+ — fear takes over. Historically, the market is in a bull market about 78% of the time. Bear markets are painful but temporary — every single one in history has recovered. ⚠️ Simulation only — not real financial advice.");
+        return;
+      }
+
+      // Progress report
+      if (p.includes("progress") || p.includes("report") || p.includes("highlight")) {
+        resolve("🎯 **This Week's Highlights:** You're actively learning the simulation — that's the most important first step!
+
+📈 **Portfolio Analysis:** Focus on understanding WHY prices move, not just watching the numbers. Check the Market Mood Board to see sector trends.
+
+📚 **Knowledge Progress:** The Learn Hub has 12 lessons — try to complete one per day. Each one builds on the last.
+
+🚀 **This Week's Goals:** 1) Complete 2 lessons in the Learn Hub. 2) Buy stocks from at least 3 different sectors. 3) Check the Strategy Simulator to compare aggressive vs. balanced investing. ⚠️ All data is from your simulation — no real money involved.");
+        return;
+      }
+
+      // Default helpful response
+      const defaults = [
+        "Great question! The most important thing about investing is starting early and staying consistent. In our simulation, practice makes perfect — try different strategies, make mistakes, and learn from them risk-free. ⚠️ This is a simulation — no real money is involved.",
+        "That's a key concept! The best investors aren't the ones who make the most trades — they're the ones who understand what they own and why. Use our Learn Hub to build that foundation. ⚠️ Simulation only — not real financial advice.",
+        "Think of investing like learning a sport — you need to practice before playing for real. Our simulation is your practice court. Make bold moves, see what happens, and build your instincts. ⚠️ This is a simulation — no real money is involved.",
+        "Excellent thinking! The market rewards patience and knowledge over excitement and guessing. Check the Market Mood Board to see today's sentiment, and always compare stocks in the same sector before buying. ⚠️ Simulation only — not real financial advice.",
+      ];
+      resolve(defaults[Math.floor(Math.random() * defaults.length)]);
+    }, 600 + Math.random() * 400); // Simulate realistic response time
+  });
+}
 }
 
 // ── SIMULATION DISCLAIMER ─────────────────────────────────────────────────────
@@ -447,13 +584,14 @@ textarea.inp { resize:vertical; }
 .modal-close:hover { color:var(--tx); background:var(--bg5); }
 
 /* Auth */
-.auth-wrap { min-height:100vh; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; overflow:auto; position:relative; }
-.auth-bg { position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,130,246,.06) 0%, transparent 70%); pointer-events:none; }
-.auth-box { position:relative; z-index:1; width:100%; max-width:440px; }
-.auth-card { background:var(--bg2); border:1px solid var(--line2); border-radius:20px; padding:32px; }
-.auth-logo { text-align:center; margin-bottom:22px; }
-.auth-logo-title { font-size:28px; font-weight:800; letter-spacing:-.5px; margin-bottom:2px; }
-.auth-logo-sub { font-size:12px; color:var(--tx2); }
+.auth-wrap { min-height:100vh; height:100vh; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto; position:relative; }
+.auth-bg { position:absolute; inset:0; background:radial-gradient(ellipse 100% 80% at 50% -10%, rgba(59,130,246,.12) 0%, rgba(139,92,246,.06) 40%, transparent 70%); pointer-events:none; }
+.auth-bg::after { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 60% 40% at 80% 80%, rgba(16,185,129,.05) 0%, transparent 60%); }
+.auth-box { position:relative; z-index:1; width:100%; max-width:460px; margin:auto; }
+.auth-card { background:var(--bg2); border:1px solid var(--line2); border-radius:24px; padding:36px; box-shadow:0 24px 80px rgba(0,0,0,.5); }
+.auth-logo { text-align:center; margin-bottom:24px; }
+.auth-logo-title { font-size:32px; font-weight:800; letter-spacing:-.8px; margin-bottom:3px; }
+.auth-logo-sub { font-size:12.5px; color:var(--tx2); }
 .auth-sim-note { background:rgba(245,158,11,.07); border:1px solid rgba(245,158,11,.2); border-radius:var(--r3); padding:10px 14px; margin-bottom:18px; }
 .auth-sim-note p { font-size:11.5px; color:var(--gld2); line-height:1.6; }
 .f-lbl { font-size:10.5px; color:var(--tx2); font-weight:700; margin-bottom:5px; text-transform:uppercase; letter-spacing:.06em; }
@@ -724,9 +862,12 @@ function Avatar({ name, color, size=34, fontSize=12 }) {
 function AuthScreen({ onLogin }) {
   const [mode,setMode]=useState("login");
   const [step,setStep]=useState(1);
-  const [form,setForm]=useState({name:"",email:"",password:"",grade:"",school:"",interests:[],riskTolerance:"moderate",goals:""});
+  const savedEmail = localStorage.getItem("ngf3_remembered_email") || "";
+  const [form,setForm]=useState({name:"",email:savedEmail,password:"",grade:"",school:"",interests:[],riskTolerance:"moderate",goals:""});
   const [err,setErr]=useState("");
   const [loading,setLoading]=useState(false);
+  const [rememberMe,setRememberMe]=useState(!!savedEmail);
+  const [showPass,setShowPass]=useState(false);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const toggleI=(i)=>set("interests",form.interests.includes(i)?form.interests.filter(x=>x!==i):[...form.interests,i]);
 
@@ -742,6 +883,11 @@ function AuthScreen({ onLogin }) {
         await new Promise(r=>setTimeout(r,700));
         const store=JSON.parse(localStorage.getItem("ngf3_db")||"{}");
         if(!store[form.email]){setErr("No account found with that email.");setLoading(false);return;}
+        // Remember me
+        if(rememberMe) localStorage.setItem("ngf3_remembered_email", form.email);
+        else localStorage.removeItem("ngf3_remembered_email");
+        // Save last session for auto-login
+        localStorage.setItem("ngf3_session", form.email);
         onLogin(store[form.email],form.email);
       } catch(e){setErr("Login failed. Try again.");}
       setLoading(false);
@@ -772,6 +918,7 @@ function AuthScreen({ onLogin }) {
         };
         store[form.email]=user;
         localStorage.setItem("ngf3_db",JSON.stringify(store));
+        localStorage.setItem("ngf3_session", form.email);
         onLogin(user,form.email);
       } catch(e){setErr("Sign up failed. Try again.");}
       setLoading(false);
@@ -805,11 +952,30 @@ function AuthScreen({ onLogin }) {
 
           {mode==="login"?(
             <>
-              <div className="f-grp"><div className="f-lbl">Email</div><input className="inp" type="email" placeholder="you@school.edu" value={form.email} onChange={e=>set("email",e.target.value)}/></div>
-              <div className="f-grp"><div className="f-lbl">Password</div><input className="inp" type="password" placeholder="••••••••" value={form.password} onChange={e=>set("password",e.target.value)} onKeyDown={e=>e.key==="Enter"&&doAuth()}/></div>
+              <div className="f-grp">
+                <div className="f-lbl">Email</div>
+                <input className="inp" type="email" placeholder="you@school.edu" value={form.email} onChange={e=>set("email",e.target.value)} autoComplete="email"/>
+              </div>
+              <div className="f-grp">
+                <div className="f-lbl">Password</div>
+                <div style={{position:"relative"}}>
+                  <input className="inp" type={showPass?"text":"password"} placeholder="••••••••" value={form.password} onChange={e=>set("password",e.target.value)} onKeyDown={e=>e.key==="Enter"&&doAuth()} autoComplete="current-password" style={{paddingRight:44}}/>
+                  <button onClick={()=>setShowPass(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--tx3)",cursor:"pointer",fontSize:16,padding:2}}>
+                    {showPass?"🙈":"👁️"}
+                  </button>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:12.5,color:"var(--tx2)"}}>
+                  <input type="checkbox" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)} style={{accentColor:"var(--blue)",width:14,height:14}}/>
+                  Remember me
+                </label>
+                <span style={{fontSize:12,color:"var(--blue2)",cursor:"pointer"}} onClick={()=>{setErr("");setMode("signup");}}>Create account →</span>
+              </div>
               <button className="btn btn-blue btn-xl" style={{width:"100%"}} onClick={doAuth} disabled={loading}>
                 {loading?<div className="spin"/>:"Sign In →"}
               </button>
+              {savedEmail&&<div style={{textAlign:"center",marginTop:12,fontSize:11.5,color:"var(--tx3)"}}>Signing in as <span style={{color:"var(--tx2)"}}>{savedEmail}</span></div>}
             </>
           ):step===1?(
             <>
@@ -2571,6 +2737,18 @@ export default function App() {
   const [badgeToast,setBadgeToast]=useState(null);
   const [showBrief,setShowBrief]=useState(false);
 
+  // Auto-login from saved session
+  useEffect(()=>{
+    const sessionEmail = localStorage.getItem("ngf3_session");
+    if(sessionEmail){
+      const store = JSON.parse(localStorage.getItem("ngf3_db")||"{}");
+      if(store[sessionEmail]){
+        setUser(store[sessionEmail]);
+        setEmail(sessionEmail);
+      }
+    }
+  },[]);
+
   // Live price simulation
   useEffect(()=>{
     const iv=setInterval(()=>{
@@ -2798,7 +2976,7 @@ export default function App() {
           {page==="glossary"    &&<GlossaryPage/>}
           {page==="report"      &&<ReportPage     user={user} prices={prices}/>}
           {page==="notifications"&&<NotifsPage    user={user} onMarkRead={handleMarkAllRead}/>}
-          {page==="profile"      &&<ProfilePage   user={user} onLogout={()=>{setUser(null);setEmail(null);setPage("dashboard");}} onAddGoal={handleAddGoal}/>}
+          {page==="profile"      &&<ProfilePage   user={user} onLogout={()=>{localStorage.removeItem("ngf3_session");setUser(null);setEmail(null);setPage("dashboard");}} onAddGoal={handleAddGoal}/>}
         </main>
       </div>
 
